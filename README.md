@@ -1,6 +1,4 @@
 "# SystemeComplexe-GENEVEY-MATHON" 
 
-\bin > cd ../src
-\src > javac -d ..\bin firefighting/*.java
-\src > cd ../bin
-\bin > java firefighting.Main
+\Projet > javac -d bin src/firefighting/*.java
+\Projet > java -cp bin firefighting.Main

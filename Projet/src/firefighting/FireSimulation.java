@@ -2,6 +2,8 @@ package firefighting;
 import java.util.Scanner;
 
 public class FireSimulation {
+    private static final int UPDATE_INTERVAL = 500; // milliseconds
+    
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
@@ -22,11 +24,21 @@ public class FireSimulation {
 
         Grid grid = new Grid(gridSize, fireSpreadProb, burnTime, treePercentage, initialFires, numSurvivors, numRobots);
 
+        long lastUpdateTime = System.currentTimeMillis();
         while (true) {
-            grid.printGrid();
-            grid.simulateStep();
-            System.out.println("Press Enter to simulate next step...");
-            scanner.nextLine();
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - lastUpdateTime >= UPDATE_INTERVAL) {
+                grid.printGrid();
+                grid.simulateStep();
+                lastUpdateTime = currentTime;
+            }
+            
+            if (System.in.available() > 0) {
+                String input = scanner.nextLine();
+                if (input.equals("q")) {
+                    break;
+                }
+            }
         }
     }
 }

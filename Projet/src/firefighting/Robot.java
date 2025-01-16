@@ -3,58 +3,184 @@ package firefighting;
 import java.util.Random;
 
 public class Robot {
-    private int x, y; // Position actuelle
+    private Point position;
     private boolean carryingSurvivor; // Indique si le robot transporte un survivant
     private final Random random = new Random();
+    private final Battery battery;
+    private final WaterTank waterTank;
+    private final Communication communication;
+    private final int id;
 
-    public Robot(int x, int y) {
-        this.x = x;
-        this.y = y;
+    public Robot(int id, int x, int y, Grid grid) {
+        this.id = id;
+        this.position = new Point(x, y);
         this.carryingSurvivor = false;
+        this.battery = new Battery();
+        this.waterTank = new WaterTank();
+        this.communication = new Communication(grid);
     }
 
-    public void act(int[][] grid) {
-        int gridSize = grid.length;
-
-        // Vérifie les cases adjacentes
-        int[] dx = {-1, 1, 0, 0};
-        int[] dy = {0, 0, -1, 1};
-
-        // Priorité 1 : Aller vers un survivant adjacent
-        for (int i = 0; i < 4; i++) {
-            int nx = x + dx[i];
-            int ny = y + dy[i];
-            if (isValid(nx, ny, gridSize) && grid[nx][ny] == 4) { // Survivant
-                moveTo(nx, ny);
-                carrySurvivor(grid);
-                return;
-            }
-        }
-
-        // Priorité 2 : Aller vers un feu adjacent
-        for (int i = 0; i < 4; i++) {
-            int nx = x + dx[i];
-            int ny = y + dy[i];
-            if (isValid(nx, ny, gridSize) && grid[nx][ny] == 2) { // Feu
-                moveTo(nx, ny);
-                extinguishFire(grid);
-                return;
-            }
-        }
-
-        // Priorité 3 : Si le robot transporte un survivant, retour à la base (0, 0)
-        if (carryingSurvivor) {
-            moveToBase();
-            if (x == 0 && y == 0) { // Dépose le survivant à la base
-                carryingSurvivor = false;
-                System.out.println("Robot a déposé un survivant à la base !");
+    public void act(Grid grid) {
+        // Skip action if charging or deploying water
+        if (battery.isCharging()) {
+            if (battery.updateChargingStatus()) {
+                System.out.println("Robot " + id + " finished charging");
             }
             return;
         }
 
-        // Déplacement aléatoire
-        moveRandomly(gridSize);
+        if (waterTank.isDeploying()) {
+            if (waterTank.updateDeploymentStatus()) {
+                System.out.println("Robot " + id + " finished deploying water");
+            }
+            return;
+        }
+
+        // Check if battery needs charging
+        if (battery.needsCharging()) {
+            moveToBase();
+            if (x == 0 && y == 0) {
+                battery.startCharging();
+                System.out.println("Robot " + id + " started charging");
+            }
+            return;
+        }
+
+        // Update local map when at base
+        if (x == 0 && y == 0 && communication.needsUpdate()) {
+            communication.updateLocalMap();
+            System.out.println("Robot " + id + " updated local map");
+        }
+
+        // Standard movement logic
+        moveAndAct(grid);
+        
+        // Consume battery
+        battery.consume(1);
     }
+
+private void moveAndAct(Grid grid) {
+    int gridSize = grid.getGridSize();
+    int[][] localGrid = communication.getLocalMap();
+    
+    // Priority 1: Rescue survivors in danger
+    if (!carryingSurvivor) {
+        Point nearestSurvivor = findNearest(localGrid, SURVIVOR);
+        if (nearestSurvivor != null && isNearFire(nearestSurvivor.x, nearestSurvivor.y, localGrid)) {
+            moveTo(nearestSurvivor.x, nearestSurvivor.y);
+            carrySurvivor(grid.getGrid());
+            return;
+        }
+    }
+    
+    // Priority 2: Return survivor to base
+    if (carryingSurvivor) {
+        moveToBase();
+        if (x == 0 && y == 0) {
+            carryingSurvivor = false;
+            System.out.println("Robot " + id + " safely delivered survivor to base");
+        }
+        return;
+    }
+    
+    // Priority 3: Fight fires near survivors
+    Point nearestFireNearSurvivor = findFireNearSurvivor(localGrid);
+    if (nearestFireNearSurvivor != null) {
+        moveTo(nearestFireNearSurvivor.x, nearestFireNearSurvivor.y);
+        waterTank.startDeployment();
+        extinguishFire(grid.getGrid());
+        return;
+    }
+    
+    // Priority 4: Explore unexplored areas
+    Point unexploredPoint = findUnexplored(localGrid);
+    if (unexploredPoint != null) {
+        moveTo(unexploredPoint.x, unexploredPoint.y);
+        return;
+    }
+    
+    // Last resort: Move randomly
+    moveRandomly(gridSize);
+}
+
+private Point findNearest(int[][] grid, int target) {
+    int minDist = Integer.MAX_VALUE;
+    Point nearest = null;
+    
+    for (int i = 0; i < grid.length; i++) {
+        for (int j = 0; j < grid[0].length; j++) {
+            if (grid[i][j] == target) {
+                int dist = Math.abs(x - i) + Math.abs(position.y - j);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = new Point(i, j);
+                }
+            }
+        }
+    }
+    return nearest;
+}
+
+private boolean isNearFire(int x, int y, int[][] grid) {
+    int[] dx = {-1, 0, 1, -1, 1, -1, 0, 1};
+    int[] dy = {-1, -1, -1, 0, 0, 1, 1, 1};
+    
+    for (int i = 0; i < 8; i++) {
+        int nx = location.x + dx[i];
+        int ny = location.y + dy[i];
+        if (isValid(nx, ny, grid.length) && grid[nx][ny] == FIRE) {
+            return true;
+        }
+    }
+    return false;
+}
+
+private Point findFireNearSurvivor(int[][] grid) {
+    for (int i = 0; i < grid.length; i++) {
+        for (int j = 0; j < grid[0].length; j++) {
+            Point location = new Point(i, j);
+            if (grid[i][j] == SURVIVOR && isNearFire(location, grid)) {
+                return findNearest(grid, FIRE);
+            }
+        }
+    }
+    return null;
+}
+
+private Point findUnexplored(int[][] grid) {
+    int radius = 3;
+    int[][] visited = new int[grid.length][grid[0].length];
+    
+    for (Robot robot : robots) {
+        int rx = robot.getX();
+        int ry = robot.getY();
+        for (int i = -radius; i <= radius; i++) {
+            for (int j = -radius; j <= radius; j++) {
+                int nx = rx + i;
+                int ny = ry + j;
+                if (isValid(nx, ny, grid.length)) {
+                    visited[nx][ny] = 1;
+                }
+            }
+        }
+    }
+    
+    // Find nearest unexplored point
+    Point nearest = null;
+    int minDist = Integer.MAX_VALUE;
+    for (int i = 0; i < grid.length; i++) {
+        for (int j = 0; j < grid[0].length; j++) {
+            if (visited[i][j] == 0) {
+                int dist = Math.abs(x - i) + Math.abs(y - j);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = new Point(i, j);
+                }
+            }
+        }
+    }
+    return nearest;
+}
 
     private void extinguishFire(int[][] grid) {
         if (grid[x][y] == 2) { // Si la case actuelle est en feu
@@ -72,26 +198,31 @@ public class Robot {
     }
 
     private void moveToBase() {
-        if (x > 0) x--;
-        else if (x < 0) x++;
-        if (y > 0) y--;
-        else if (y < 0) y++;
+        int newX = position.x;
+        int newY = position.y;
+        
+        if (newX  > 0) newX --;
+        else if (newX  < 0) newX ++;
+        if (newY > 0) newY--;
+        else if (newY < 0) newY++;
+
+        position = new Point(newX, newY);
     }
 
-    private void moveTo(int nx, int ny) {
-        x = nx;
-        y = ny;
+    private void moveTo(Point newPosition) {
+        this.position = newPosition;
     }
 
     private void moveRandomly(int gridSize) {
         int nx, ny;
         do {
-            int dx = random.nextInt(3) - 1; // -1, 0, ou 1
-            int dy = random.nextInt(3) - 1; // -1, 0, ou 1
-            nx = x + dx;
-            ny = y + dy;
-        } while (!isValid(nx, ny, gridSize)); // Vérifie que la nouvelle position est valide
-        moveTo(nx, ny);
+            int dx = random.nextInt(3) - 1; // -1, 0, or 1
+            int dy = random.nextInt(3) - 1; // -1, 0, or 1
+            nx = position.x + dx;
+            ny = position.y + dy;
+        } while (!isValid(nx, ny, gridSize));
+        
+        position = new Point(nx, ny);
     }
 
     private boolean isValid(int nx, int ny, int gridSize) {
@@ -99,11 +230,11 @@ public class Robot {
     }
 
     public int getX() {
-        return x;
+        return position.x;
     }
 
     public int getY() {
-        return y;
+        return position.y;
     }
 
     public boolean isCarryingSurvivor() {

@@ -3,12 +3,12 @@ package firefighting;
 import java.util.Random;
 
 public class Grid {
-    private static final int EMPTY = 0;
-    private static final int TREE = 1;
-    private static final int FIRE = 2;
-    private static final int ASH = 3;
-    private static final int SURVIVOR = 4;
-    private static final double FIRE_SPREAD_DECAY = 0.1;
+    public static final int EMPTY = 0;
+    public static final int TREE = 1;
+    public static final int FIRE = 2;
+    public static final int ASH = 3;
+    public static final int SURVIVOR = 4;
+    public static final double FIRE_SPREAD_DECAY = 0.1; // Facteur de réduction de la probabilité de propagation du feu.
 
     private final int gridSize;
     private final double fireSpreadProb;
@@ -16,8 +16,9 @@ public class Grid {
     private final double treePercentage;
     private final int[][] grid;
     private final int[][] burnTimes;
-    private final Robot[] robots;
+    private Robot[] robots;
     private final Random random;
+    private SwarmCoordinator coordinator;
 
     public Grid(int gridSize, double fireSpreadProb, int burnTime, double treePercentage, int initialFires, int numSurvivors, int numRobots) {
         this.gridSize = gridSize;
@@ -28,19 +29,39 @@ public class Grid {
         this.burnTimes = new int[gridSize][gridSize];
         this.random = new Random();
         this.robots = new Robot[numRobots];
-
+        // this.coordinator = null;
+            
+        // Create SwarmCoordinator instance first
+        // this.coordinator = new SwarmCoordinator(robots, this);
+        
+        // Initialize robots with the coordinator
+        // for (int i = 0; i < numRobots; i++) {
+        //     robots[i] = new Robot(i, 0, 0, this, coordinator);
+        // }
         initializeGrid(initialFires, numSurvivors, numRobots);
     }
+    
+    // Définir les robots de la simulation.
+    public void setRobots(Robot[] robots) {
+        this.robots = robots;
+    }
+    
+    // Associer le coordinateur des robots.
+    public void setCoordinator(SwarmCoordinator coordinator) {
+        this.coordinator = coordinator;
+    }
 
+    // Retourne l'état actuel de la grille.
     public int[][] getGrid() {
         return grid;
     }
     
+    // Retourne la taille de la grille.
     public int getGridSize() {
         return gridSize;
     }
 
-    // Modify fire spread simulation to include decay
+    // Vérifie si une case est adjacente à une case en feu (en tenant compte de la probabilité de propagation réduite).    
     private boolean isAdjacentToFire(int x, int y) {
         int[] dx = {-1, 1, 0, 0, -1, -1, 1, 1};
         int[] dy = {0, 0, -1, 1, -1, 1, -1, 1};
@@ -48,7 +69,6 @@ public class Grid {
             int nx = x + dx[i];
             int ny = y + dy[i];
             if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize && grid[nx][ny] == FIRE) {
-                // Adjust spread probability based on distance
                 return random.nextDouble() < (fireSpreadProb * (1 - FIRE_SPREAD_DECAY * 
                     Math.sqrt(dx[i]*dx[i] + dy[i]*dy[i])));
             }
@@ -56,8 +76,8 @@ public class Grid {
         return false;
     }
 
+    // Initialise la grille avec les arbres, les feux initiaux, les survivants et les robots.
     private void initializeGrid(int initialFires, int numSurvivors, int numRobots) {
-        // Fill grid with trees
         for (int i = 0; i < gridSize; i++) {
             for (int j = 0; j < gridSize; j++) {
                 grid[i][j] = random.nextDouble() < treePercentage ? TREE : EMPTY;
@@ -65,7 +85,7 @@ public class Grid {
             }
         }
 
-        // Add initial fires
+        // Ajout des feux initiaux.
         for (int i = 0; i < initialFires; i++) {
             Point location;
             do {
@@ -75,7 +95,7 @@ public class Grid {
             burnTimes[location.x][location.y] = burnTime;
         }
 
-        // Add survivors
+        // Ajout des survivants.
         for (int i = 0; i < numSurvivors; i++) {
             Point location;
             do {
@@ -84,22 +104,24 @@ public class Grid {
             grid[location.x][location.y] = SURVIVOR;
         }
 
-        // Add robots
+        // Ajout des robots.
         for (int i = 0; i < numRobots; i++) {
-            robots[i] = new Robot(i, 0, 0, this);
+            robots[i] = new Robot(i, 0, 0, this, coordinator);
         }
     }
 
+    // Simule une étape de la propagation du feu et les actions des robots.
     public void simulateStep() {
-        // Update fire spread and burning trees
+        // Mise à jour des cases en feu.
         for (int i = 0; i < gridSize; i++) {
             for (int j = 0; j < gridSize; j++) {
                 if (grid[i][j] == FIRE) {
-                    burnTimes[i][j]--;
+                    burnTimes[i][j]--; // Réduit le temps de combustion.
                     if (burnTimes[i][j] <= 0) {
-                        grid[i][j] = ASH;
+                        grid[i][j] = ASH; // Devient de la cendre.
                     }
                 } else if (grid[i][j] == TREE) {
+                    // Propagation du feu à un arbre.
                     if (isAdjacentToFire(i, j) && random.nextDouble() < fireSpreadProb) {
                         grid[i][j] = FIRE;
                         burnTimes[i][j] = burnTime;
@@ -108,9 +130,9 @@ public class Grid {
             }
         }
 
-        // Update robots
+        // Actions des robots.
         for (Robot robot : robots) {
-            robot.act(grid);
+            robot.act(this);
         }
     }
 
@@ -128,7 +150,8 @@ public class Grid {
         }
         return false;
     }
-
+    
+    // Affiche la grille actuelle dans la console.
     public void printGrid() {
         for (int i = 0; i < gridSize; i++) {
             for (int j = 0; j < gridSize; j++) {
@@ -152,6 +175,21 @@ public class Grid {
             }
             System.out.println();
         }
+    }
+    public static int getSURVIVOR() {
+        return SURVIVOR;
+    }
+
+    public static int getFIRE() {
+        return FIRE;
+    }
+
+    public static int getASH() {
+        return ASH;
+    }
+
+    public static int getEMPTY() {
+        return EMPTY;
     }
 }
 

@@ -14,6 +14,7 @@ public class Point {
         return "Point(" + x + ", " + y + ")";
     }
     
+    // Méthode pour comparer deux objets Point. Deux points sont égaux si leurs x et y sont identiques.
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
@@ -22,6 +23,7 @@ public class Point {
         return x == point.x && y == point.y;
     }
     
+    // Méthode pour générer un code de hachage (hash code) unique pour un point.
     @Override
     public int hashCode() {
         return 31 * x + y;

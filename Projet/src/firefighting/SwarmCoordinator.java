@@ -32,22 +32,22 @@ public class SwarmCoordinator {
             for (int j = 0; j < grid.getGridSize(); j++) {
                 priorityMap[i][j] = 0; // Réinitialisation des priorités
                 
-                // Increase priority for unexplored areas
+                // Augmenter la priorité des zones non explorées
                 if (explorationMap[i][j] == 0) {
                     priorityMap[i][j] += 2;
                 }
                 
-                // High priority for fires near survivors
+                // Priorité élevée pour les incendies proches de survivants
                 if (hasNearbyFire(i, j) && hasNearbySurvivor(i, j)) {
                     priorityMap[i][j] += 5;
                 }
                 
-                // Medium priority for standalone fires
+                // Priorité moyenne pour les incendies isolés
                 if (grid.getGrid()[i][j] == Grid.getFIRE()) {
                     priorityMap[i][j] += 3;
                 }
                 
-                // Highest priority for survivors in immediate danger
+                // Priorité maximale pour les survivants en danger immédiat (proches d'un incendie)
                 if (grid.getGrid()[i][j] == Grid.getSURVIVOR() && hasAdjacentFire(i, j)) {
                     priorityMap[i][j] += 10;
                 }
@@ -55,8 +55,12 @@ public class SwarmCoordinator {
         }
     }
     
+    /**
+    * Assigne une nouvelle cible à un robot en fonction des priorités.
+    * @param robot Le robot pour lequel une cible doit être assignée.
+    * @return La position de la cible assignée.
+    */
     public Point assignTarget(Robot robot) {
-        // Find highest priority unexplored area not targeted by other robots
         Point bestTarget = null;
         int highestPriority = -1;
         
@@ -72,6 +76,13 @@ public class SwarmCoordinator {
         return bestTarget;
     }
     
+    /**
+    * Vérifie si une position est déjà ciblée par un autre robot.
+    * @param x La coordonnée X de la position.
+    * @param y La coordonnée Y de la position.
+    * @param currentRobot Le robot actuel.
+    * @return Vrai si la position est ciblée par un autre robot, sinon faux.
+    */
     private boolean isTargetedByOtherRobot(int x, int y, Robot currentRobot) {
         for (Robot robot : robots) {
             if (robot != currentRobot && robot.getTargetX() == x && robot.getTargetY() == y) {
@@ -81,6 +92,12 @@ public class SwarmCoordinator {
         return false;
     }
     
+    /**
+    * Met à jour la carte d'exploration autour d'une position donnée.
+    * @param x La coordonnée X du centre.
+    * @param y La coordonnée Y du centre.
+    * @param radius Le rayon d'exploration.
+    */
     public void updateExplorationMap(int x, int y, int radius) {
         for (int i = Math.max(0, x - radius); i < Math.min(grid.getGridSize(), x + radius + 1); i++) {
             for (int j = Math.max(0, y - radius); j < Math.min(grid.getGridSize(), y + radius + 1); j++) {
@@ -89,19 +106,37 @@ public class SwarmCoordinator {
         }
     }
     
-    // Helper methods for checking surrounding cells
+    // Méthodes auxiliaires pour vérifier l'état des cellules voisines
+
+    /**
+    * Vérifie si un incendie est proche d'une position donnée.
+    */
     private boolean hasNearbyFire(int x, int y) {
         return checkSurroundingCells(x, y, Grid.getFIRE(), 2);
     }
     
+    /**
+    * Vérifie si un survivant est proche d'une position donnée.
+    */
     private boolean hasNearbySurvivor(int x, int y) {
         return checkSurroundingCells(x, y, Grid.getSURVIVOR(), 2);
     }
     
+    /**
+    * Vérifie si un incendie est adjacent à une position donnée.
+    */
     private boolean hasAdjacentFire(int x, int y) {
         return checkSurroundingCells(x, y, Grid.getFIRE(), 1);
     }
     
+    /**
+    * Vérifie si une cellule cible est présente dans un rayon donné.
+    * @param x La coordonnée X de la cellule centrale.
+    * @param y La coordonnée Y de la cellule centrale.
+    * @param targetValue La valeur recherchée (incendie ou survivant).
+    * @param radius Le rayon de recherche.
+    * @return Vrai si une cellule cible est trouvée, sinon faux.
+    */
     private boolean checkSurroundingCells(int x, int y, int targetValue, int radius) {
         for (int i = Math.max(0, x - radius); i < Math.min(grid.getGridSize(), x + radius + 1); i++) {
             for (int j = Math.max(0, y - radius); j < Math.min(grid.getGridSize(), y + radius + 1); j++) {
@@ -113,10 +148,16 @@ public class SwarmCoordinator {
         return false;
     }
 
+    /**
+    * Définit une nouvelle grille pour le coordinateur.
+    */
     public void setGrid(Grid grid) {
         this.grid = grid;
     }
 
+    /**
+    * Définit les robots gérés par le coordinateur.
+    */
     public void setRobots(Robot[] robots) {
         this.robots = robots;
     }
